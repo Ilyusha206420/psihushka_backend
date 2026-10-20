@@ -1,8 +1,9 @@
-import zlib
 from enum import Enum, auto
 from typing import override
+import zlib
 
-from sqlalchemy import create_engine
+from fastapi import FastAPI
+from sqlalchemy import Integer, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from sqlalchemy.schema import ForeignKey
 
@@ -16,30 +17,52 @@ class HashEnum(Enum):
         ) -> int:
         hash = zlib.crc32(name.encode())
         if hash in last_values:
-            raise ValueError (f"Error in HashEnum class\n Key {name} generate hash {hash} which is already in use.")
+            raise ValueError ("Error in HashEnum class\n" +
+                             f"Key {name} generate hash {hash} which is already in use.")
         return hash
 
 
 class MethodTypes(HashEnum):
-    START_POINT = auto() 
-    END_OF_STEP = auto() 
-    END_OF_GAME = auto()
     NPC_REPLICA = auto()
     PLAYER_REPLICA = auto()
+    START_POS = auto()
 
 
 class Base(DeclarativeBase): pass
 
 
-class EventMethodDict(Base):
+class EventMethod(Base):
     __tablename__: str = "event_method_dict"
 
-    method_id: Mapped[MethodTypes] = mapped_column(primary_key=True)
-    method_name: Mapped[str] = mapped_column()
+    method_id: Mapped[MethodTypes] = mapped_column(Integer, primary_key=True)
+    method_name: Mapped[str] = mapped_column(unique=True)
 
-    @classmethod
-    def setUp(cls, session: Session):
-        ...
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EventMethod):
+            return NotImplemented
+        return self.method_id == other.method_id and self.method_name == other.method_name 
+
+    @classmethod 
+    def synchWithSourceMethods(cls, session: Session):
+        initialized_methods = session.query(EventMethod).all();
+        adding_methods: list[EventMethod] = [];
+        for met in MethodTypes:
+            new_method = EventMethod(method_id=met.value, method_name=met.name) 
+            need_add = True
+            for check in initialized_methods:
+                if check == new_method:
+                    need_add = False
+                    break
+                if check.method_id == new_method.method_id and check.method_name != new_method.method_name:
+                    raise ValueError ("Error with adding new method in DB\n" + 
+                                     f"Trying to  add id: {new_method.method_id} name: {new_method.method_name}\n" +
+                                     f"Error with id: {check.method_id} name: {check.method_name}")
+            if need_add:
+                adding_methods.append(new_method)
+
+        session.add_all(adding_methods)
+        session.commit()
 
 
 class ContentRegistry(Base):
@@ -48,24 +71,15 @@ class ContentRegistry(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
 
-class NPCDialogContent(Base):
-    __tablename__: str = "npc_dialog_content"
+class TextsContent(Base):
+    __tablename__: str = "texts"
 
     id: Mapped[int] = mapped_column(
+        Text,
         ForeignKey("content_registry.id", onupdate="CASCADE"), 
         primary_key=True
     )
-    text: Mapped[str] = mapped_column() 
-
-
-class PlayerDialogContent(Base):
-    __tablename__: str = "player_dialog_content"
-
-    id: Mapped[int] = mapped_column(
-        ForeignKey("content_registry.id", onupdate="CASCADE"), 
-        primary_key=True
-    )
-    text: Mapped[str] = mapped_column()
+    text: Mapped[str] = mapped_column(unique=True) 
 
 
 class GameNode(Base):
@@ -73,6 +87,7 @@ class GameNode(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     method: Mapped[MethodTypes] = mapped_column(
+        Integer,
         ForeignKey("event_method_dict.method_id", onupdate="CASCADE")
     )
     data_id: Mapped[int | None] = mapped_column(
@@ -92,6 +107,9 @@ class GameGraph(Base):
         primary_key=True
     )
 
+    def get_all_next(self):
+        ...
+
 
 db_url = "sqlite:///database/db.db"
 sql_engine = create_engine(db_url, echo=True)
@@ -99,4 +117,10 @@ sql_engine = create_engine(db_url, echo=True)
 Base.metadata.create_all(bind=sql_engine)
 session = Session(sql_engine)
 
-EventMethodDict.setUp(session)
+EventMethod.synchWithSourceMethods(session)
+
+app = FastAPI()
+
+@app.get("")
+def root():
+    ...
