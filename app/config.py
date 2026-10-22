@@ -1,6 +1,6 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+from typing import ClassVar
 
 class Settings(BaseSettings):
 
@@ -8,8 +8,8 @@ class Settings(BaseSettings):
 
     debug: bool = True
 
-    model_configL: SettingsConfigDict = SettingsConfigDict(
-        env_file="../.env.dev",
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        env_file=".env.dev",
         env_file_encoding="utf-8"
     )
 

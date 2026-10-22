@@ -9,7 +9,6 @@ class Base(DeclarativeBase):
     pass
 
 db_engine = create_engine(url=settings.database_url, echo=settings.debug)
-Base.metadata.create_all(bind=db_engine)
 
 SessionLocal = sessionmaker(bind=db_engine)
 
