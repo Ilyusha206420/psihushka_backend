@@ -14,4 +14,6 @@ class _BaseHashedEnum(int, Enum):
 
 class Methods(_BaseHashedEnum):
     START_POS = auto()
-
+    INTERNAL_MSG = auto()
+    NPC_REPLICA = auto()
+    PLAYER_REPLICA = auto()

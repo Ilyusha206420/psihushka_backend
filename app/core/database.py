@@ -12,7 +12,7 @@ db_engine = create_engine(url=settings.database_url, echo=settings.debug)
 
 SessionLocal = sessionmaker(bind=db_engine)
 
-def get_db() -> Generator[Session, None, None]:
+def get_db():
     db = SessionLocal()
     try:
         yield db
