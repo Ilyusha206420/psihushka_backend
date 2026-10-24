@@ -1,0 +1,3 @@
+from authx import AuthXConfig
+
+
